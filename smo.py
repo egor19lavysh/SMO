@@ -29,7 +29,10 @@ class SMO:
         self._s = None
         self._n = None
         self._w = None
+        self._u = None
         self._beta = None
+        self.c = 1
+        self.eta = None
 
     def fit(self, x: list[float] | np.ndarray, y: list[float] | np.ndarray) -> None:
         if isinstance(x, list):
@@ -50,7 +53,7 @@ class SMO:
         self._s = self._p1.shape[1]
         self._n = len(p1[0])
 
-        self._w = self._train()
+        self._u, self._w = self._train()
         self._beta = self._compute_beta()
 
     def predict(self, x: list[float] | np.ndarray) -> np.ndarray:
@@ -107,14 +110,38 @@ class SMO:
             lambda_k = lambda_k_hat
         return lambda_k
 
-    def _compute_beta(self) -> float:
-        low = max([float(1 - np.dot(self._w, p_i)) for p_i in self._p1.T])
-        high = min([float(-1 - np.dot(self._w, p_i)) for p_i in self._p2.T])
-        beta = (low + high) / 2
-        return beta
+    def _check_kkt(self, u, v, tol=1e-3):
+        for i in range(self._m):
+            grad = np.dot(v, self._p[i]) - self._ksi(i)
+            if u[i] == 0 and grad < -tol:
+                return False
+            elif u[i] == self.c and grad > tol:
+                return False
+            elif 0 < u[i] < self.c and abs(grad) > tol:
+                return False
+        return True
 
-    def _train(self, max_iter: int = 1000) -> np.ndarray:
+    def _compute_beta(self) -> float:
+        # Случай 1: Используем опорные векторы (0 < u_i < C)
+        mask = (self._u > 0) & (self._u < self.c)
+        if np.any(mask):
+            beta_values = [
+                (1 / self._ksi(i)) - np.dot(self._w, self._p[i])
+                for i in np.where(mask)[0]
+            ]
+            return float(np.median(beta_values))
+
+        # Случай 2: Минимизация T(β)
+        beta_grid = np.linspace(-10, 10, 1000)
+        losses = [self._compute_T(beta) for beta in beta_grid]
+        return float(beta_grid[*np.argmin(losses)])
+
+    def _compute_T(self, beta: float) -> float:
+        return sum([np.maximum(0, 1 - self._ksi(i) * (np.dot(self._p, self._w) + beta)) for i in range(self._m)])
+
+    def _train(self, max_iter: int = 1000) -> tuple[np.ndarray, np.ndarray]:
         s, m, n = self._s, self._m, self._n
+        ksi = np.array([1 if i < self._s else -1 for i in range(self._m)])
 
         u = np.zeros(m)
         v = np.dot(self._a, u)
@@ -127,21 +154,37 @@ class SMO:
 
             delta_k = self._compute_delta(v, i_min=i_min, i_max=i_max)
 
-            if delta_k == 0:
-                return v
+            if delta_k <= 1e-6:
+                break
 
             lambda_k_hat = delta_k / (np.linalg.norm(self._p[i_min] - self._p[i_max]) ** 2)
 
             lambda_k = self._compute_lambda_k(i_min, i_max, lambda_k_hat, u)
 
             u_new = u.copy()
+
             u_new[i_min] += self._ksi(i_min) * lambda_k
             u_new[i_max] -= self._ksi(i_max) * lambda_k
             v += lambda_k * (self._p[i_min] - self._p[i_max])
 
+            u_new[i_min] = np.clip(u_new[i_min], 0, self.c)
+            u_new[i_max] = np.clip(u_new[i_max], 0, self.c)
+
+            current_sum = np.sum(ksi * u_new)
+            if abs(current_sum) > 1e-6:
+                delta = current_sum / (self._ksi(i_min) - self._ksi(i_max))
+                u_new[i_min] -= delta * self._ksi(i_min)
+                u_new[i_max] += delta * self._ksi(i_max)
+                u_new[i_min] = np.clip(u_new[i_min], 0, self.c)
+                u_new[i_max] = np.clip(u_new[i_max], 0, self.c)
+
+            v = np.dot(self._a, u_new)
             u = u_new
 
-        return v
+            if self._check_kkt(u, v):
+                break
 
-    def get_сoefficients(self) -> tuple[float, float]:
+        return u, v
+
+    def get_coefficients(self) -> tuple[float, float]:
         return self._w, self._beta

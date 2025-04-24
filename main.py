@@ -19,7 +19,7 @@ def test_smo():
     assert np.all(predictions == y), "Предсказания модели не совпадают с истинными метками!"
 
     # Проверяем, что гиперплоскость корректно разделяет данные
-    w, beta = smo.get_сoefficients()
+    w, beta = smo.get_coefficients()
     for i in range(len(X)):
         decision = np.dot(X[i], w) + beta
         if y[i] == 1:
@@ -38,4 +38,4 @@ def test_2():
     smo.fit(np.vstack((p1[:25], p2[:25])), y)
     print(smo.predict(np.vstack((p2[25:], p1[25:]))))
 
-test_2()
+test_smo()
