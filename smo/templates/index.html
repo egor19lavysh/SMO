@@ -1,0 +1,44 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>SMO Classifier</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>SMO Classifier</h1>
+
+        <div class="section">
+            <h2>Загрузите обучающие данные (CSV или XLSX):</h2>
+            <form action="/upload_train" method="post" enctype="multipart/form-data">
+                <input type="file" name="file" accept=".csv,.xlsx">
+                <button type="submit">Загрузить</button>
+            </form>
+        </div>
+
+        <div class="section">
+            <h2>Обучить модель</h2>
+            <form action="/train" method="post">
+                <button type="submit">Обучить модель</button>
+            </form>
+        </div>
+
+        <div class="section">
+            <h2>Загрузите данные для предсказания (CSV или XLSX):</h2>
+            <form action="/predict" method="post" enctype="multipart/form-data">
+                <input type="file" name="predict_file" accept=".csv,.xlsx">
+                <button type="submit">Предсказать</button>
+            </form>
+        </div>
+
+        {% if image %}
+        <div class="section">
+            <h2>График разделения точек</h2>
+            <img src="{{ image }}" alt="График разделения точек">
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

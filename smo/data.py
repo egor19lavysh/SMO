@@ -45,7 +45,7 @@ import pandas as pd
 
 
 def test_3():
-    dt = Dataset()
+    dt = Dataset(n=3)
     dt.create_dataset()
     p1, p2 = dt.get_dataset()
 
