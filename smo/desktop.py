@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from smo import SMO
+from smo import SMO  # Убедитесь, что smo.py доступен
 
 
 class App:
@@ -12,34 +12,49 @@ class App:
         self.root = root
         self.root.title("SMO Classifier")
 
-
         self.X_train = None
         self.y_train = None
         self.model = None
 
+        # Переменные для отображения метрик
+        self.metrics_labels = {}
 
         self.create_widgets()
 
     def create_widgets(self):
-
+        # --- Загрузка данных ---
         self.label_load = tk.Label(self.root, text="Загрузите данные (CSV или XLSX):")
         self.label_load.pack(pady=10)
 
         self.button_load = tk.Button(self.root, text="Загрузить", command=self.load_data)
         self.button_load.pack(pady=5)
 
+        # --- Обучение модели ---
         self.button_train = tk.Button(self.root, text="Обучить модель", command=self.train_model, state=tk.DISABLED)
         self.button_train.pack(pady=5)
 
+        # --- Предсказание ---
         self.button_predict = tk.Button(
             self.root, text="Предсказать", command=self.predict_data, state=tk.DISABLED
         )
         self.button_predict.pack(pady=5)
 
+        # --- График ---
         self.figure = plt.Figure(figsize=(6, 4), dpi=100)
         self.ax = self.figure.add_subplot(111)
         self.canvas = FigureCanvasTkAgg(self.figure, master=self.root)
         self.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+
+        # --- Метрики качества ---
+        metrics_frame = tk.Frame(self.root)
+        metrics_frame.pack(pady=10)
+
+        metrics_titles = ['Accuracy', 'Precision', 'Recall', 'F1 Score']
+        for i, title in enumerate(metrics_titles):
+            tk.Label(metrics_frame, text=title + ":", width=10, anchor='w').grid(row=i, column=0)
+            label = tk.Label(metrics_frame, text="—", width=15, anchor='w', fg='gray')
+            label.grid(row=i, column=1)
+            self.metrics_labels[title] = label
 
     def load_data(self):
         file_path = filedialog.askopenfilename(
@@ -56,14 +71,11 @@ class App:
             else:
                 raise ValueError("Неподдерживаемый формат файла")
 
-
             if "y" not in data.columns:
                 raise ValueError("Столбец 'y' не найден в данных")
 
-
             self.X_train = data.drop(columns=["y"]).values
             self.y_train = data["y"].values
-
 
             self.button_train.config(state=tk.NORMAL)
             messagebox.showinfo("Успех", "Данные успешно загружены!")
@@ -76,20 +88,37 @@ class App:
             return
 
         try:
-
             self.model = SMO(C=1.0)
             self.model.fit(self.X_train, self.y_train)
 
             self.button_predict.config(state=tk.NORMAL)
             messagebox.showinfo("Успех", "Модель успешно обучена!")
 
-
-            if self.X_train.shape[1] == 2:
-                self.plot_data_and_decision_boundary()
-
+            # Обновляем график
             self.plot_data_and_decision_boundary()
+
+            # Обновляем метрики
+            self.update_metrics()
+
         except Exception as e:
             messagebox.showerror("Ошибка", str(e))
+
+    def update_metrics(self):
+        """Обновляет отображение метрик после обучения"""
+        try:
+            accuracy, precision, recall, f1_score = self.model.get_metrics()
+            metrics = {
+                'Accuracy': accuracy,
+                'Precision': precision,
+                'Recall': recall,
+                'F1 Score': f1_score
+            }
+
+            for key, label in self.metrics_labels.items():
+                value = metrics.get(key, "—")
+                label.config(text=f"{value:.4f}" if isinstance(value, (int, float)) else value)
+        except Exception as e:
+            messagebox.showerror("Ошибка", f"Не удалось обновить метрики: {str(e)}")
 
     def predict_data(self):
         file_path = filedialog.askopenfilename(
@@ -114,10 +143,10 @@ class App:
             y_pred = self.model.predict(X_test)
 
             output_path = filedialog.asksaveasfilename(defaultextension=".csv")
-            if output_path[-4:] == ".csv":
+            if output_path.endswith(".csv"):
                 pd.DataFrame({"y_pred": y_pred}).to_csv(output_path, index=False)
                 messagebox.showinfo("Успех", f"Результаты сохранены в {output_path}")
-            elif output_path[-4:] == "xlsx":
+            elif output_path.endswith(".xlsx"):
                 pd.DataFrame({"y_pred": y_pred}).to_excel(output_path, index=False)
                 messagebox.showinfo("Успех", f"Результаты сохранены в {output_path}")
         except Exception as e:
@@ -130,7 +159,6 @@ class App:
         n_features = self.X_train.shape[1]
         if n_features > 3:
             raise ValueError("Визуализация поддерживается только для данных размерности 2 или 3.")
-
 
         self.ax.clear()
 
@@ -180,7 +208,6 @@ class App:
         if n_features == 3:
             self.ax.set_zlabel("X3")
         self.canvas.draw()
-
 
 if __name__ == "__main__":
     root = tk.Tk()

@@ -30,13 +30,26 @@ class SMO:
         self.ksi = None
         self._C = C
 
+        self._accuracy = None
+        self._precision = None
+        self._recall = None
+        self._f1_score = None
+
     def fit(self, X: list[float] | np.ndarray, y: list[float] | np.ndarray) -> None:
         if isinstance(X, list):
-            x = np.array(X)
+            X = np.array(X)
         if isinstance(y, list):
             y = np.array(y)
         if len(y) != len(X):
             raise Exception("Длины векторов фичей и меток не совпадают")
+
+        quantile = int(len(X) * 0.25)
+
+        X_test = X[-quantile:]
+        y_test = y[-quantile:]
+
+        X = X[:-quantile]
+        y = y[:-quantile]
 
         p1 = X[y == 1]
         p2 = X[y == -1]
@@ -51,6 +64,8 @@ class SMO:
         self._ksi = np.array([1 if i < self._s else -1 for i in range(self._m)])
         self._u, self._w = self._train()
         self._beta = self._compute_beta()
+
+        self.evaluate_metrics(X_test, y_test)
 
     def predict(self, X: list[float] | np.ndarray) -> np.ndarray:
         if isinstance(X, list):
@@ -178,5 +193,33 @@ class SMO:
 
         return u, v
 
+    def evaluate_metrics(self, X_test: np.ndarray | list, y_test: np.ndarray | list) -> None:
+        y_pred = self.predict(X_test)
+
+        tp = np.sum((y_pred == 1) & (y_test == 1))
+        fp = np.sum((y_pred == 1) & (y_test == -1))
+        fn = np.sum((y_pred == -1) & (y_test == 1))
+        tn = np.sum((y_pred == -1) & (y_test == -1))
+
+        accuracy = (tp + tn) / (tp + tn + fp + fn) if (tp + tn + fp + fn) > 0 else 0
+
+        precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+        recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+
+        if precision + recall > 0:
+            f1_score = 2 * (precision * recall) / (precision + recall)
+        else:
+            f1_score = 0
+
+
+        print(tp, fp, tn, fn)
+        self._accuracy = float(accuracy)
+        self._precision = float(precision)
+        self._recall = float(recall)
+        self._f1_score = float(f1_score)
+
     def get_coefficients(self) -> tuple[float, float]:
         return self._w, self._beta
+
+    def get_metrics(self) -> tuple[float, float, float, float]:
+        return self._accuracy, self._precision, self._recall, self._f1_score

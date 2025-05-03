@@ -1,8 +1,8 @@
+# app.py
 from flask import Flask, render_template, request, redirect, url_for, send_file
 import pandas as pd
 import numpy as np
 import matplotlib
-
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -14,14 +14,16 @@ from smo import SMO
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 
+# Глобальные переменные
 X_train = None
 y_train = None
 model = None
+metrics = None  # Для хранения метрик
 
 
 @app.route('/')
 def index():
-    return render_template('index.html', image=None)
+    return render_template('index.html', image=None, metrics=metrics)
 
 
 @app.route('/upload_train', methods=['POST'])
@@ -54,15 +56,59 @@ def upload_train():
 
 @app.route('/train', methods=['POST'])
 def train():
-    global X_train, y_train, model
+    global X_train, y_train, model, metrics
     if X_train is None or y_train is None:
         return "Данные не загружены", 400
 
     try:
         model = SMO(C=1.0)
         model.fit(X_train, y_train)
+
         image_url = generate_plot(X_train, y_train, model)
-        return render_template('index.html', image=image_url)
+
+        # Получаем метрики
+        accuracy, precision, recall, f1_score = model.get_metrics()
+        metrics = {
+            'accuracy': accuracy,
+            'precision': precision,
+            'recall': recall,
+            'f1_score': f1_score
+        }
+
+        return render_template('index.html', image=image_url, metrics=metrics)
+    except Exception as e:
+        return str(e), 400
+
+
+@app.route('/predict', methods=['POST'])
+def predict():
+    global model
+    if model is None:
+        return "Модель не обучена", 400
+
+    if 'predict_file' not in request.files:
+        return "Файл не выбран", 400
+
+    file = request.files['predict_file']
+    if file.filename == '':
+        return "Файл не выбран", 400
+
+    try:
+        if file.filename.endswith('.csv'):
+            data = pd.read_csv(file)
+        elif file.filename.endswith('.xlsx'):
+            data = pd.read_excel(file)
+        else:
+            return "Неподдерживаемый формат файла", 400
+
+        X_test = data.values
+        y_pred = model.predict(X_test)
+
+        # Сохраняем результаты
+        temp_file = os.path.join(app.config['UPLOAD_FOLDER'], 'predictions.csv')
+        pd.DataFrame({'y_pred': y_pred}).to_csv(temp_file, index=False)
+
+        return send_file(temp_file, as_attachment=True, download_name='predictions.csv')
     except Exception as e:
         return str(e), 400
 
@@ -113,38 +159,6 @@ def generate_plot(X, y, model):
     plt.close(fig)
     data = base64.b64encode(buf.getvalue()).decode('utf-8')
     return 'data:image/png;base64,' + data
-
-
-@app.route('/predict', methods=['POST'])
-def predict():
-    global model
-    if model is None:
-        return "Модель не обучена", 400
-
-    if 'predict_file' not in request.files:
-        return "Файл не выбран", 400
-
-    file = request.files['predict_file']
-    if file.filename == '':
-        return "Файл не выбран", 400
-
-    try:
-        if file.filename.endswith('.csv'):
-            data = pd.read_csv(file)
-        elif file.filename.endswith('.xlsx'):
-            data = pd.read_excel(file)
-        else:
-            return "Неподдерживаемый формат файла", 400
-
-        X_test = data.values
-        y_pred = model.predict(X_test)
-
-        temp_file = os.path.join(app.config['UPLOAD_FOLDER'], 'predictions.csv')
-        pd.DataFrame({'y_pred': y_pred}).to_csv(temp_file, index=False)
-
-        return send_file(temp_file, as_attachment=True, download_name='predictions.csv')
-    except Exception as e:
-        return str(e), 400
 
 
 if __name__ == '__main__':
