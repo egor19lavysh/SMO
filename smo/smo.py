@@ -1,5 +1,6 @@
 import numpy as np
-
+from scipy.optimize import linprog
+from scipy.spatial import ConvexHull
 
 class SMO:
     """
@@ -54,6 +55,9 @@ class SMO:
         p1 = X[y == 1]
         p2 = X[y == -1]
 
+        if self._check_intersection(p1, p2):
+            raise ValueError("Выпуклые оболочки множеств P1 и P2 должны не пересекаться!")
+
         self._p1 = np.array(p1).T
         self._p2 = np.array(p2).T
         self._A = np.hstack((self._p1, -self._p2))
@@ -66,6 +70,33 @@ class SMO:
         self._beta = self._compute_beta()
 
         self.evaluate_metrics(X_test, y_test)
+
+
+
+    @staticmethod
+    def _check_intersection(p1: np.ndarray, p2: np.ndarray) -> bool:
+        """
+        Проверяет пересечение двух выпуклых оболочек.
+        """
+        def is_point_inside_hull(point, hull, tolerance=1e-12):
+            """
+            Проверяет, находится ли точка внутри выпуклой оболочки.
+            """
+            return all((np.dot(eq[:-1], point) + eq[-1]) <= tolerance for eq in hull.equations)
+
+        hull1, hull2 = ConvexHull(p1), ConvexHull(p2)
+
+        for i in hull1.vertices:
+            point = hull1.points[i]
+            if is_point_inside_hull(point, hull2):
+                return True
+
+        for i in hull2.vertices:
+            point = hull2.points[i]
+            if is_point_inside_hull(point, hull1):
+                return True
+
+        return False
 
     def predict(self, X: list[float] | np.ndarray) -> np.ndarray:
         if isinstance(X, list):
@@ -212,7 +243,6 @@ class SMO:
             f1_score = 0
 
 
-        print(tp, fp, tn, fn)
         self._accuracy = float(accuracy)
         self._precision = float(precision)
         self._recall = float(recall)

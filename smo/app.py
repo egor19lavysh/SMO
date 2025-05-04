@@ -14,11 +14,10 @@ from smo import SMO
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 
-# Глобальные переменные
 X_train = None
 y_train = None
 model = None
-metrics = None  # Для хранения метрик
+metrics = None
 
 
 @app.route('/')
@@ -66,7 +65,6 @@ def train():
 
         image_url = generate_plot(X_train, y_train, model)
 
-        # Получаем метрики
         accuracy, precision, recall, f1_score = model.get_metrics()
         metrics = {
             'accuracy': accuracy,
@@ -104,7 +102,6 @@ def predict():
         X_test = data.values
         y_pred = model.predict(X_test)
 
-        # Сохраняем результаты
         temp_file = os.path.join(app.config['UPLOAD_FOLDER'], 'predictions.csv')
         pd.DataFrame({'y_pred': y_pred}).to_csv(temp_file, index=False)
 
@@ -132,7 +129,7 @@ def generate_plot(X, y, model):
         y_min = (-beta - w[0] * x_min) / (w[1] if w[1] != 0 else 1e-6)
         y_max = (-beta - w[0] * x_max) / (w[1] if w[1] != 0 else 1e-6)
         ax.plot([x_min, x_max], [y_min, y_max], 'k--', label='Линия разделения')
-    else:  # 3D
+    else:
         ax = fig.add_subplot(111, projection='3d')
         class_1 = X[y == 1]
         class_2 = X[y == -1]

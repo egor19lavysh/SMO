@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from smo import SMO  # Убедитесь, что smo.py доступен
+from smo import SMO
 
 
 class App:
@@ -16,36 +16,36 @@ class App:
         self.y_train = None
         self.model = None
 
-        # Переменные для отображения метрик
+
         self.metrics_labels = {}
 
         self.create_widgets()
 
     def create_widgets(self):
-        # --- Загрузка данных ---
+
         self.label_load = tk.Label(self.root, text="Загрузите данные (CSV или XLSX):")
         self.label_load.pack(pady=10)
 
         self.button_load = tk.Button(self.root, text="Загрузить", command=self.load_data)
         self.button_load.pack(pady=5)
 
-        # --- Обучение модели ---
+
         self.button_train = tk.Button(self.root, text="Обучить модель", command=self.train_model, state=tk.DISABLED)
         self.button_train.pack(pady=5)
 
-        # --- Предсказание ---
+
         self.button_predict = tk.Button(
             self.root, text="Предсказать", command=self.predict_data, state=tk.DISABLED
         )
         self.button_predict.pack(pady=5)
 
-        # --- График ---
+
         self.figure = plt.Figure(figsize=(6, 4), dpi=100)
         self.ax = self.figure.add_subplot(111)
         self.canvas = FigureCanvasTkAgg(self.figure, master=self.root)
         self.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
 
-        # --- Метрики качества ---
+
         metrics_frame = tk.Frame(self.root)
         metrics_frame.pack(pady=10)
 
@@ -94,10 +94,10 @@ class App:
             self.button_predict.config(state=tk.NORMAL)
             messagebox.showinfo("Успех", "Модель успешно обучена!")
 
-            # Обновляем график
+
             self.plot_data_and_decision_boundary()
 
-            # Обновляем метрики
+
             self.update_metrics()
 
         except Exception as e:
